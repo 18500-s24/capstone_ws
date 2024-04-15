@@ -1,0 +1,20 @@
+<?xml version="1.0"?>
+<package format="2">
+  <name>kinect2_map</name>
+  <version>0.1.0</version>
+  <description>ROS 2 package for converting Kinect One point cloud to OctoMap</description>
+  <maintainer email="yfshi@cmu.edu">Yufei Shi</maintainer>
+  <license>MIT</license>
+
+  <buildtool_depend>ament_cmake</buildtool_depend>
+  <depend>rclcpp</depend>
+  <depend>sensor_msgs</depend>
+  <depend>octomap_msgs</depend>
+  <depend>pcl_conversions</depend>
+  <depend>libpcl-all-dev</depend>
+  <depend>octomap</depend>
+
+  <export>
+    <build_type>ament_cmake</build_type>
+  </export>
+</package>
