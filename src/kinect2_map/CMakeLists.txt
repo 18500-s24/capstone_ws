@@ -12,6 +12,7 @@ find_package(octomap_msgs REQUIRED)
 find_package(PCL REQUIRED)
 find_package(pcl_conversions REQUIRED)
 find_package(octomap REQUIRED)
+find_package(std_msgs REQUIRED)
 
 # Add executable
 add_executable(kinect2_map_node src/kinect2_map_node.cpp)
@@ -31,7 +32,8 @@ ament_target_dependencies(kinect2_map_node
   sensor_msgs
   octomap_msgs
   pcl_conversions
-  octomap)
+  octomap
+  std_msgs)
 
 # Install
 install(TARGETS kinect2_map_node
