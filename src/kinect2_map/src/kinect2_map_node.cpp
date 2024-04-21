@@ -85,7 +85,7 @@ class KinectOctomapNode : public rclcpp::Node {
 
     // services
     rclcpp::Service<std_srvs::srv::Trigger>::SharedPtr save_octree_service_;
-    rclcpp::Service<std_srvs::srv::Trigger>::SharedPtr calibrate_base_service;
+    rclcpp::Service<std_srvs::srv::Trigger>::SharedPtr calibrate_base_service_;
     rclcpp::Service<std_srvs::srv::Trigger>::SharedPtr
         calibrate_xmin_ymin_service_;
     rclcpp::Service<std_srvs::srv::Trigger>::SharedPtr
@@ -183,6 +183,15 @@ class KinectOctomapNode : public rclcpp::Node {
         this->updateCalibrationStatus();
         response->success = true;
         response->message = "Xmin Ymax calibrated successfully.";
+    }
+
+    void calibrateXmaxYmaxCallback(
+        const std_srvs::srv::Trigger::Request::SharedPtr request,
+        std_srvs::srv::Trigger::Response::SharedPtr response) {
+        this->calibrated_xmax_ymax = true;
+        this->updateCalibrationStatus();
+        response->success = true;
+        response->message = "Xmax Ymax calibrated successfully.";
     }
 };
 
