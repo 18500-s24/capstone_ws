@@ -12,7 +12,7 @@
 class KinectOctomapNode : public rclcpp::Node {
   public:
     KinectOctomapNode() : Node("kinect_octomap_node"), current_tree(0.01) {
-        // Initialize publishers and subscribers
+        // subscribers
         point_cloud_subscriber_ =
             this->create_subscription<sensor_msgs::msg::PointCloud2>(
                 "/kinect2/hd/points",
@@ -21,33 +21,88 @@ class KinectOctomapNode : public rclcpp::Node {
                     .best_effort(),
                 std::bind(&KinectOctomapNode::pointCloudCallback, this,
                           std::placeholders::_1));
+
+        // publishers
         octomap_publisher_ = this->create_publisher<octomap_msgs::msg::Octomap>(
             "/kinect2_map/octomap", 10);
         intarray_publisher_ =
             this->create_publisher<std_msgs::msg::UInt8MultiArray>(
                 "/kinect2_map/intarray", 10);
 
-        // Declare a parameter for storing the output path
+        // parameter for storing the output path
         this->declare_parameter<std::string>("output_path", "~/tree.bt");
 
-        // Service to save the octree
-        save_service_ = this->create_service<std_srvs::srv::Trigger>(
+        // service to save the octree
+        save_octree_service_ = this->create_service<std_srvs::srv::Trigger>(
             "save_octree",
             std::bind(&KinectOctomapNode::saveOctreeCallback, this,
                       std::placeholders::_1, std::placeholders::_2));
+
+        // service to calibrate the base
+        calibrate_base_service_ = this->create_service<std_srvs::srv::Trigger>(
+            "calibrate_base",
+            std::bind(&KinectOctomapNode::calibrateBaseCallback, this,
+                      std::placeholders::_1, std::placeholders::_2));
+
+        // service to calibrate the xmin ymin
+        calibrate_xmin_ymin_service_ =
+            this->create_service<std_srvs::srv::Trigger>(
+                "calibrate_xmin_ymin",
+                std::bind(&KinectOctomapNode::calibrateXminYminCallback, this,
+                          std::placeholders::_1, std::placeholders::_2));
+
+        // service to calibrate the xmax ymin
+        calibrate_xmax_ymin_service_ =
+            this->create_service<std_srvs::srv::Trigger>(
+                "calibrate_xmax_ymin",
+                std::bind(&KinectOctomapNode::calibrateXmaxYminCallback, this,
+                          std::placeholders::_1, std::placeholders::_2));
+
+        // service to calibrate the xmin ymax
+        calibrate_xmin_ymax_service_ =
+            this->create_service<std_srvs::srv::Trigger>(
+                "calibrate_xmin_ymax",
+                std::bind(&KinectOctomapNode::calibrateXminYmaxCallback, this,
+                          std::placeholders::_1, std::placeholders::_2));
+
+        // service to calibrate the xmax ymax
+        calibrate_xmax_ymax_service_ =
+            this->create_service<std_srvs::srv::Trigger>(
+                "calibrate_xmax_ymax",
+                std::bind(&KinectOctomapNode::calibrateXmaxYmaxCallback, this,
+                          std::placeholders::_1, std::placeholders::_2));
     }
 
   private:
+    // subscribers
     rclcpp::Subscription<sensor_msgs::msg::PointCloud2>::SharedPtr
         point_cloud_subscriber_;
+
+    // publishers
     rclcpp::Publisher<octomap_msgs::msg::Octomap>::SharedPtr octomap_publisher_;
     rclcpp::Publisher<std_msgs::msg::UInt8MultiArray>::SharedPtr
         intarray_publisher_;
-    rclcpp::Service<std_srvs::srv::Trigger>::SharedPtr save_service_;
+
+    // services
+    rclcpp::Service<std_srvs::srv::Trigger>::SharedPtr save_octree_service_;
+    rclcpp::Service<std_srvs::srv::Trigger>::SharedPtr calibrate_base_service;
+    rclcpp::Service<std_srvs::srv::Trigger>::SharedPtr
+        calibrate_xmin_ymin_service_;
+    rclcpp::Service<std_srvs::srv::Trigger>::SharedPtr
+        calibrate_xmax_ymin_service_;
+    rclcpp::Service<std_srvs::srv::Trigger>::SharedPtr
+        calibrate_xmin_ymax_service_;
+    rclcpp::Service<std_srvs::srv::Trigger>::SharedPtr
+        calibrate_xmax_ymax_service_;
 
     octomap::OcTree current_tree;
 
     bool calibrated = false;
+    bool calibrated_base = false;
+    bool calibrated_xmin_ymin = false;
+    bool calibrated_xmax_ymin = false;
+    bool calibrated_xmin_ymax = false;
+    bool calibrated_xmax_ymax = false;
 
     void
     pointCloudCallback(const sensor_msgs::msg::PointCloud2::SharedPtr msg) {
@@ -72,6 +127,13 @@ class KinectOctomapNode : public rclcpp::Node {
         octomap_publisher_->publish(octomap_msg);
     }
 
+    void updateCalibrationStatus() {
+        this->calibrated =
+            this->calibrated_base && this->calibrated_xmin_ymin &&
+            this->calibrated_xmax_ymin && this->calibrated_xmin_ymax &&
+            this->calibrated_xmax_ymax;
+    }
+
     void
     saveOctreeCallback(const std_srvs::srv::Trigger::Request::SharedPtr request,
                        std_srvs::srv::Trigger::Response::SharedPtr response) {
@@ -85,6 +147,42 @@ class KinectOctomapNode : public rclcpp::Node {
             this->get_parameter("output_path").as_string());
         response->success = true;
         response->message = "Octree saved successfully.";
+    }
+
+    void calibrateBaseCallback(
+        const std_srvs::srv::Trigger::Request::SharedPtr request,
+        std_srvs::srv::Trigger::Response::SharedPtr response) {
+        this->calibrated_base = true;
+        this->updateCalibrationStatus();
+        response->success = true;
+        response->message = "Base calibrated successfully.";
+    }
+
+    void calibrateXminYminCallback(
+        const std_srvs::srv::Trigger::Request::SharedPtr request,
+        std_srvs::srv::Trigger::Response::SharedPtr response) {
+        this->calibrated_xmin_ymin = true;
+        this->updateCalibrationStatus();
+        response->success = true;
+        response->message = "Xmin Ymin calibrated successfully.";
+    }
+
+    void calibrateXmaxYminCallback(
+        const std_srvs::srv::Trigger::Request::SharedPtr request,
+        std_srvs::srv::Trigger::Response::SharedPtr response) {
+        this->calibrated_xmax_ymin = true;
+        this->updateCalibrationStatus();
+        response->success = true;
+        response->message = "Xmax Ymin calibrated successfully.";
+    }
+
+    void calibrateXminYmaxCallback(
+        const std_srvs::srv::Trigger::Request::SharedPtr request,
+        std_srvs::srv::Trigger::Response::SharedPtr response) {
+        this->calibrated_xmin_ymax = true;
+        this->updateCalibrationStatus();
+        response->success = true;
+        response->message = "Xmin Ymax calibrated successfully.";
     }
 };
 
