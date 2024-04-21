@@ -1,4 +1,0 @@
-# SaveOctree.srv
----
-bool success  # indicate if the save was successful
-string message  # additional information

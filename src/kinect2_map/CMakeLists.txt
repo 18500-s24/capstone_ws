@@ -14,11 +14,6 @@ find_package(pcl_conversions REQUIRED)
 find_package(octomap REQUIRED)
 find_package(std_msgs REQUIRED)
 find_package(std_srvs REQUIRED)
-find_package(rosidl_default_generators REQUIRED)
-
-rosidl_generate_interfaces(${PROJECT_NAME}
-  srv/SaveOcTree.srv
-)
 
 # Add executable
 add_executable(kinect2_map_node src/kinect2_map_node.cpp)
@@ -40,8 +35,7 @@ ament_target_dependencies(kinect2_map_node
   pcl_conversions
   octomap
   std_msgs
-  std_srvs
-  rosidl_default_runtime)
+  std_srvs)
 
 # Install
 install(TARGETS kinect2_map_node
