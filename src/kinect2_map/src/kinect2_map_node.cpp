@@ -9,7 +9,7 @@
 #include <pcl/point_types.h>                 /* pcl::PointXYZ */
 #include <pcl_conversions/pcl_conversions.h> /* pcl_conversions::fromROSMsg */
 
-#include <ifstream> /* std::ifstream */
+#include <fstream> /* std::ifstream */
 
 class KinectOctomapNode : public rclcpp::Node {
   public:
