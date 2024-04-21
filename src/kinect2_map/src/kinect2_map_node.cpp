@@ -3,11 +3,13 @@
 #include <rclcpp/rclcpp.hpp>                /* obvious */
 #include <sensor_msgs/msg/point_cloud2.hpp> /* sensor_msgs::msg::PointCloud2 */
 #include <std_msgs/msg/u_int8_multi_array.hpp> /* std_msgs::msg::UInt8MultiArray */
-#include <std_srvs/srv/trigger.hpp>
+#include <std_srvs/srv/trigger.hpp>            /* std_srvs::srv::Trigger */
 
 #include <pcl/point_cloud.h>                 /* pcl::PointCloud */
 #include <pcl/point_types.h>                 /* pcl::PointXYZ */
 #include <pcl_conversions/pcl_conversions.h> /* pcl_conversions::fromROSMsg */
+
+#include <ifstream> /* std::ifstream */
 
 class KinectOctomapNode : public rclcpp::Node {
   public:
@@ -127,13 +129,6 @@ class KinectOctomapNode : public rclcpp::Node {
         octomap_publisher_->publish(octomap_msg);
     }
 
-    void updateCalibrationStatus() {
-        this->calibrated =
-            this->calibrated_base && this->calibrated_xmin_ymin &&
-            this->calibrated_xmax_ymin && this->calibrated_xmin_ymax &&
-            this->calibrated_xmax_ymax;
-    }
-
     void
     saveOctreeCallback(const std_srvs::srv::Trigger::Request::SharedPtr request,
                        std_srvs::srv::Trigger::Response::SharedPtr response) {
@@ -143,10 +138,20 @@ class KinectOctomapNode : public rclcpp::Node {
             return;
         }
 
+        std::ifstream tree_file;
+        tree_file.open(this->get_parameter("output_path").as_string());
+
         current_tree.writeBinary(
             this->get_parameter("output_path").as_string());
         response->success = true;
         response->message = "Octree saved successfully.";
+    }
+
+    void updateCalibrationStatus() {
+        this->calibrated =
+            this->calibrated_base && this->calibrated_xmin_ymin &&
+            this->calibrated_xmax_ymin && this->calibrated_xmin_ymax &&
+            this->calibrated_xmax_ymax;
     }
 
     void calibrateBaseCallback(
