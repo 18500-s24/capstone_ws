@@ -117,7 +117,6 @@ class KinectOctomapNode : public rclcpp::Node {
         pcl::fromROSMsg(*msg, *cloud);
 
         // Convert pcl::PointCloud to octomap
-        current_tree.clear();
         for (const auto &point : cloud->points) {
             current_tree.updateNode(octomap::point3d(point.x, point.y, point.z),
                                     true);
