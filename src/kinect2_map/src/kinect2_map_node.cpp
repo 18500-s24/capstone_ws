@@ -108,8 +108,11 @@ class KinectOctomapNode : public rclcpp::Node {
 
     void
     pointCloudCallback(const sensor_msgs::msg::PointCloud2::SharedPtr msg) {
-        if (!this->calibrated)
+        if (!this->calibrated) {
+            RCLCPP_WARN(this->get_logger(),
+                        "Calibration not done yet. Ignoring point cloud.");
             return;
+        }
 
         // Convert sensor_msgs::PointCloud2 to pcl::PointCloud
         pcl::PointCloud<pcl::PointXYZ>::Ptr cloud(
@@ -126,6 +129,8 @@ class KinectOctomapNode : public rclcpp::Node {
         octomap_msgs::msg::Octomap octomap_msg;
         octomap_msgs::fullMapToMsg(current_tree, octomap_msg);
         octomap_publisher_->publish(octomap_msg);
+        RCLCPP_INFO(this->get_logger(),
+                    "Octomap_msg published to /kinect2_map/octomap.");
     }
 
     void
@@ -151,11 +156,21 @@ class KinectOctomapNode : public rclcpp::Node {
             this->calibrated_base && this->calibrated_xmin_ymin &&
             this->calibrated_xmax_ymin && this->calibrated_xmin_ymax &&
             this->calibrated_xmax_ymax;
+
+        if (this->calibrated) {
+            RCLCPP_INFO(this->get_logger(), "Calibration done.");
+        }
     }
 
     void calibrateBaseCallback(
         const std_srvs::srv::Trigger::Request::SharedPtr request,
         std_srvs::srv::Trigger::Response::SharedPtr response) {
+        if (this->calibrated_base) {
+            response->success = false;
+            response->message = "Base already calibrated.";
+            return;
+        }
+
         this->calibrated_base = true;
         this->updateCalibrationStatus();
         response->success = true;
@@ -165,6 +180,12 @@ class KinectOctomapNode : public rclcpp::Node {
     void calibrateXminYminCallback(
         const std_srvs::srv::Trigger::Request::SharedPtr request,
         std_srvs::srv::Trigger::Response::SharedPtr response) {
+        if (this->calibrated_xmin_ymin) {
+            response->success = false;
+            response->message = "Xmin Ymin already calibrated.";
+            return;
+        }
+
         this->calibrated_xmin_ymin = true;
         this->updateCalibrationStatus();
         response->success = true;
@@ -174,6 +195,12 @@ class KinectOctomapNode : public rclcpp::Node {
     void calibrateXmaxYminCallback(
         const std_srvs::srv::Trigger::Request::SharedPtr request,
         std_srvs::srv::Trigger::Response::SharedPtr response) {
+        if (this->calibrated_xmax_ymin) {
+            response->success = false;
+            response->message = "Xmax Ymin already calibrated.";
+            return;
+        }
+
         this->calibrated_xmax_ymin = true;
         this->updateCalibrationStatus();
         response->success = true;
@@ -183,6 +210,12 @@ class KinectOctomapNode : public rclcpp::Node {
     void calibrateXminYmaxCallback(
         const std_srvs::srv::Trigger::Request::SharedPtr request,
         std_srvs::srv::Trigger::Response::SharedPtr response) {
+        if (this->calibrated_xmin_ymax) {
+            response->success = false;
+            response->message = "Xmin Ymax already calibrated.";
+            return;
+        }
+
         this->calibrated_xmin_ymax = true;
         this->updateCalibrationStatus();
         response->success = true;
@@ -192,6 +225,12 @@ class KinectOctomapNode : public rclcpp::Node {
     void calibrateXmaxYmaxCallback(
         const std_srvs::srv::Trigger::Request::SharedPtr request,
         std_srvs::srv::Trigger::Response::SharedPtr response) {
+        if (this->calibrated_xmax_ymax) {
+            response->success = false;
+            response->message = "Xmax Ymax already calibrated.";
+            return;
+        }
+
         this->calibrated_xmax_ymax = true;
         this->updateCalibrationStatus();
         response->success = true;
