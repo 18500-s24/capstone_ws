@@ -10,8 +10,7 @@ def generate_launch_description():
                 package="kinect2_map",
                 executable="kinect2_map_node",
                 name="kinect2_map_node",
-                output="screen",
-                parameters=[{"output_path": "/home/kafka/tree.bt"}],
+                output="screen"
             )
         ]
     )

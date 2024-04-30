@@ -14,6 +14,7 @@ find_package(pcl_conversions REQUIRED)
 find_package(octomap REQUIRED)
 find_package(std_msgs REQUIRED)
 find_package(std_srvs REQUIRED)
+find_package(Eigen3 REQUIRED)
 
 # Add executable
 add_executable(kinect2_map_node src/kinect2_map_node.cpp)
@@ -27,6 +28,7 @@ add_definitions(${PCL_DEFINITIONS})
 target_link_libraries(kinect2_map_node
   ${Boost_SYSTEM_LIBRARY}
   ${PCL_LIBRARIES}
+  Eigen3::Eigen
 )
 ament_target_dependencies(kinect2_map_node
   rclcpp
@@ -35,7 +37,8 @@ ament_target_dependencies(kinect2_map_node
   pcl_conversions
   octomap
   std_msgs
-  std_srvs)
+  std_srvs
+  Eigen3)
 
 # Install
 install(TARGETS kinect2_map_node
