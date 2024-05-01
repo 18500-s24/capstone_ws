@@ -207,17 +207,20 @@ class KinectOctomapNode : public rclcpp::Node {
 
         // To avoid the RRT from creating a path through the unreachable
         // regions, we need to set the unreachable regions as occupied
-        int scene_x_max = this->get_parameter("scene_x_max").as_int();
-        int scene_y_max = this->get_parameter("scene_y_max").as_int();
-        int scene_z_max = this->get_parameter("scene_z_max").as_int();
-        int arm_max_reach = this->get_parameter("arm_max_readh").as_int();
-        for (int x = 0; x < scene_x_max; x++) {
-            for (int y = 0; y < scene_y_max; y++) {
-                for (int z = 0; z < scene_z_max; z++) {
-                    int dist = std::sqrt(x * x + y * y + z * z);
-                    if (dist > arm_max_reach) {
-                        current_tree->updateNode(octomap::point3d(x, y, z),
-                                                 true);
+        // Only do this if calibration is done
+        if (this->calibrated) {
+            int scene_x_max = this->get_parameter("scene_x_max").as_int();
+            int scene_y_max = this->get_parameter("scene_y_max").as_int();
+            int scene_z_max = this->get_parameter("scene_z_max").as_int();
+            int arm_max_reach = this->get_parameter("arm_max_readh").as_int();
+            for (int x = 0; x < scene_x_max; x++) {
+                for (int y = 0; y < scene_y_max; y++) {
+                    for (int z = 0; z < scene_z_max; z++) {
+                        int dist = std::sqrt(x * x + y * y + z * z);
+                        if (dist > arm_max_reach) {
+                            current_tree->updateNode(octomap::point3d(x, y, z),
+                                                     true);
+                        }
                     }
                 }
             }
