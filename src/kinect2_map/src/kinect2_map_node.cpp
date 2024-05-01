@@ -13,7 +13,7 @@
 #include <pcl/point_types.h>                 /* pcl::PointXYZ */
 #include <pcl_conversions/pcl_conversions.h> /* pcl_conversions::fromROSMsg */
 
-#include <cmath>   /* sin, cos */
+#include <cmath>   /* sin, cos, sqrt */
 #include <fstream> /* std::ifstream */
 #include <math.h>  /* M_PI */
 
@@ -46,11 +46,21 @@ class KinectOctomapNode : public rclcpp::Node {
         this->declare_parameter<double>("x_translation", 0.0);
         this->declare_parameter<double>("y_translation", 0.0);
         this->declare_parameter<double>("z_translation", 0.0);
+        this->declare_parameter<int>("scene_x_max", 120);  // in cm
+        this->declare_parameter<int>("scene_y_max", 60);   // in cm
+        this->declare_parameter<int>("scene_z_max", 60);   // in cm
+        this->declare_parameter<int>("arm_max_readh", 50); // in cm
 
         // service to save the octree
         save_octree_service_ = this->create_service<std_srvs::srv::Trigger>(
             "save_octree",
             std::bind(&KinectOctomapNode::saveOctreeCallback, this,
+                      std::placeholders::_1, std::placeholders::_2));
+
+        // service to mark calibration done
+        calibration_service_ = this->create_service<std_srvs::srv::Trigger>(
+            "calibration",
+            std::bind(&KinectOctomapNode::calibrationCallback, this,
                       std::placeholders::_1, std::placeholders::_2));
     }
 
@@ -73,12 +83,15 @@ class KinectOctomapNode : public rclcpp::Node {
 
     // services
     rclcpp::Service<std_srvs::srv::Trigger>::SharedPtr save_octree_service_;
-    rclcpp::Service<std_srvs::srv::Trigger>::SharedPtr calibrate_base_service_;
+    rclcpp::Service<std_srvs::srv::Trigger>::SharedPtr calibration_service_;
 
     octomap::OcTree *current_tree = nullptr;
 
     bool calibrated = true;
 
+    /**
+     * @brief Compose a transformation matrix based on the parameters
+     */
     Eigen::Matrix4f prepareTransformationMatrix() {
         // get rotation and translation parameters
         float x_rot_deg =
@@ -131,16 +144,32 @@ class KinectOctomapNode : public rclcpp::Node {
         return transform;
     }
 
+    /**
+     * @brief Crop the point cloud to the scene dimensions
+     */
+    pcl::PointCloud<pcl::PointXYZ>::Ptr
+    cropPointCloud(pcl::PointCloud<pcl::PointXYZ>::Ptr cloud) {
+        pcl::PointCloud<pcl::PointXYZ>::Ptr cropped_cloud(
+            new pcl::PointCloud<pcl::PointXYZ>);
+
+        int scene_x_max = this->get_parameter("scene_x_max").as_int();
+        int scene_y_max = this->get_parameter("scene_y_max").as_int();
+        int scene_z_max = this->get_parameter("scene_z_max").as_int();
+
+        for (const auto &point : cloud->points) {
+            if (point.x < scene_x_max && point.y < scene_y_max &&
+                point.z < scene_z_max) {
+                cropped_cloud->push_back(point);
+            }
+        }
+
+        return cropped_cloud;
+    }
+
     void
     pointCloudCallback(const sensor_msgs::msg::PointCloud2::SharedPtr msg) {
         RCLCPP_INFO(this->get_logger(),
                     "Received a newly published sensor message.");
-
-        if (!this->calibrated) {
-            RCLCPP_WARN(this->get_logger(),
-                        "Calibration not done yet. Ignoring point cloud.");
-            return;
-        }
 
         // Reinitialize the octree with a fresh one each time
         if (current_tree != nullptr) {
@@ -165,13 +194,35 @@ class KinectOctomapNode : public rclcpp::Node {
         pcl::transformPointCloud(*cloud, *transformed_cloud,
                                  transformation_matrix);
 
-        // Crop the point cloud
+        // Crop the point cloud if calibration is done
+        if (this->calibrated) {
+            transformed_cloud = cropPointCloud(transformed_cloud);
+        }
 
         // Convert pcl::PointCloud to octomap
         for (const auto &point : transformed_cloud->points) {
             current_tree->updateNode(
                 octomap::point3d(point.x, point.y, point.z), true);
         }
+
+        // To avoid the RRT from creating a path through the unreachable
+        // regions, we need to set the unreachable regions as occupied
+        int scene_x_max = this->get_parameter("scene_x_max").as_int();
+        int scene_y_max = this->get_parameter("scene_y_max").as_int();
+        int scene_z_max = this->get_parameter("scene_z_max").as_int();
+        int arm_max_reach = this->get_parameter("arm_max_readh").as_int();
+        for (int x = 0; x < scene_x_max; x++) {
+            for (int y = 0; y < scene_y_max; y++) {
+                for (int z = 0; z < scene_z_max; z++) {
+                    int dist = std::sqrt(x * x + y * y + z * z);
+                    if (dist > arm_max_reach) {
+                        current_tree->updateNode(octomap::point3d(x, y, z),
+                                                 true);
+                    }
+                }
+            }
+        }
+
         RCLCPP_INFO(this->get_logger(),
                     "Converted pcl point cloud to octomap::octree.\n");
 
@@ -199,6 +250,14 @@ class KinectOctomapNode : public rclcpp::Node {
             this->get_parameter("output_path").as_string());
         response->success = true;
         response->message = "Octree saved successfully.";
+    }
+
+    void calibrationCallback(
+        const std_srvs::srv::Trigger::Request::SharedPtr request,
+        std_srvs::srv::Trigger::Response::SharedPtr response) {
+        this->calibrated = true;
+        response->success = true;
+        response->message = "Calibration done.";
     }
 };
 
