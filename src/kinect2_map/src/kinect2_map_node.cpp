@@ -46,10 +46,10 @@ class KinectOctomapNode : public rclcpp::Node {
         this->declare_parameter<double>("x_translation", 0.0);
         this->declare_parameter<double>("y_translation", 0.0);
         this->declare_parameter<double>("z_translation", 0.0);
-        this->declare_parameter<int>("scene_x_max", 120);  // in cm
-        this->declare_parameter<int>("scene_y_max", 60);   // in cm
-        this->declare_parameter<int>("scene_z_max", 60);   // in cm
-        this->declare_parameter<int>("arm_max_readh", 50); // in cm
+        this->declare_parameter<double>("scene_x_max", 1.20);  // in meters
+        this->declare_parameter<double>("scene_y_max", 0.6);   // in meters
+        this->declare_parameter<double>("scene_z_max", 0.6);   // in meters
+        this->declare_parameter<double>("arm_max_readh", 0.5); // in meters
 
         // service to save the octree
         save_octree_service_ = this->create_service<std_srvs::srv::Trigger>(
@@ -209,14 +209,18 @@ class KinectOctomapNode : public rclcpp::Node {
         // regions, we need to set the unreachable regions as occupied
         // Only do this if calibration is done
         if (this->calibrated) {
-            int scene_x_max = this->get_parameter("scene_x_max").as_int();
-            int scene_y_max = this->get_parameter("scene_y_max").as_int();
-            int scene_z_max = this->get_parameter("scene_z_max").as_int();
-            int arm_max_reach = this->get_parameter("arm_max_readh").as_int();
-            for (int x = 0; x < scene_x_max; x++) {
-                for (int y = 0; y < scene_y_max; y++) {
-                    for (int z = 0; z < scene_z_max; z++) {
-                        int dist = std::sqrt(x * x + y * y + z * z);
+            float scene_x_max = static_cast<float>(
+                this->get_parameter("scene_x_max").as_double());
+            float scene_y_max = static_cast<float>(
+                this->get_parameter("scene_y_max").as_double());
+            float scene_z_max = static_cast<float>(
+                this->get_parameter("scene_z_max").as_double());
+            float arm_max_reach = static_cast<float>(
+                this->get_parameter("arm_max_readh").as_double());
+            for (float x = 0.005; x < scene_x_max; x += 0.005) {
+                for (float y = 0.005; y < scene_y_max; y += 0.005) {
+                    for (float z = 0.005; z < scene_z_max; z += 0.005) {
+                        float dist = std::sqrt(x * x + y * y + z * z);
                         if (dist > arm_max_reach) {
                             current_tree->updateNode(octomap::point3d(x, y, z),
                                                      true);
