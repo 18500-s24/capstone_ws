@@ -152,9 +152,12 @@ class KinectOctomapNode : public rclcpp::Node {
         pcl::PointCloud<pcl::PointXYZ>::Ptr cropped_cloud(
             new pcl::PointCloud<pcl::PointXYZ>);
 
-        int scene_x_max = this->get_parameter("scene_x_max").as_int();
-        int scene_y_max = this->get_parameter("scene_y_max").as_int();
-        int scene_z_max = this->get_parameter("scene_z_max").as_int();
+        float scene_x_max =
+            static_cast<float>(this->get_parameter("scene_x_max").as_double());
+        float scene_y_max =
+            static_cast<float>(this->get_parameter("scene_y_max").as_double());
+        float scene_z_max =
+            static_cast<float>(this->get_parameter("scene_z_max").as_double());
 
         for (const auto &point : cloud->points) {
             if (point.x < scene_x_max && point.y < scene_y_max &&
