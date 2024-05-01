@@ -87,7 +87,7 @@ class KinectOctomapNode : public rclcpp::Node {
 
     octomap::OcTree *current_tree = nullptr;
 
-    bool calibrated = true;
+    bool calibrated = false;
 
     /**
      * @brief Compose a transformation matrix based on the parameters
