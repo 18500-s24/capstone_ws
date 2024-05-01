@@ -247,12 +247,6 @@ class KinectOctomapNode : public rclcpp::Node {
     void
     saveOctreeCallback(const std_srvs::srv::Trigger::Request::SharedPtr request,
                        std_srvs::srv::Trigger::Response::SharedPtr response) {
-        if (!this->calibrated) {
-            response->success = false;
-            response->message = "Calibration not done yet.";
-            return;
-        }
-
         std::ifstream tree_file;
         tree_file.open(this->get_parameter("output_path").as_string());
 
