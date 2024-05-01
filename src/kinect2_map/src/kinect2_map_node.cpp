@@ -40,7 +40,7 @@ class KinectOctomapNode : public rclcpp::Node {
         // parameters
         this->declare_parameter<double>("octree_resolution", 0.01);
         this->declare_parameter<std::string>("output_path", "~/tree.bt");
-        this->declare_parameter<double>("x_rotation", 0.0);
+        this->declare_parameter<double>("x_rotation", 240.0);
         this->declare_parameter<double>("y_rotation", 0.0);
         this->declare_parameter<double>("z_rotation", 0.0);
         this->declare_parameter<double>("x_translation", 0.0);
