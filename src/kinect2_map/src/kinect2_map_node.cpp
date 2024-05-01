@@ -13,7 +13,7 @@
 #include <pcl/point_types.h>                 /* pcl::PointXYZ */
 #include <pcl_conversions/pcl_conversions.h> /* pcl_conversions::fromROSMsg */
 
-#include <cmath>   /* sin, cos, sqrt */
+#include <cmath>   /* sin, cos, sqrt, pow */
 #include <fstream> /* std::ifstream */
 #include <math.h>  /* M_PI */
 
@@ -46,9 +46,12 @@ class KinectOctomapNode : public rclcpp::Node {
         this->declare_parameter<double>("x_translation", 0.0);
         this->declare_parameter<double>("y_translation", 0.0);
         this->declare_parameter<double>("z_translation", 0.0);
-        this->declare_parameter<double>("scene_x_max", 1.20);  // in meters
-        this->declare_parameter<double>("scene_y_max", 0.6);   // in meters
-        this->declare_parameter<double>("scene_z_max", 0.6);   // in meters
+        this->declare_parameter<double>("scene_x_max", 1.28);  // in meters
+        this->declare_parameter<double>("scene_y_max", 0.64);  // in meters
+        this->declare_parameter<double>("scene_z_max", 0.64);  // in meters
+        this->declare_parameter<double>("arm_base_x", 0.61);   // in meters
+        this->declare_parameter<double>("arm_base_y", 0.0);    // in meters
+        this->declare_parameter<double>("arm_base_z", 0.0);    // in meters
         this->declare_parameter<double>("arm_max_readh", 0.5); // in meters
 
         // service to save the octree
@@ -152,6 +155,9 @@ class KinectOctomapNode : public rclcpp::Node {
         pcl::PointCloud<pcl::PointXYZ>::Ptr cropped_cloud(
             new pcl::PointCloud<pcl::PointXYZ>);
 
+        float scene_x_min = 0.0;
+        float scene_y_min = 0.0;
+        float scene_z_min = 0.0;
         float scene_x_max =
             static_cast<float>(this->get_parameter("scene_x_max").as_double());
         float scene_y_max =
@@ -160,8 +166,9 @@ class KinectOctomapNode : public rclcpp::Node {
             static_cast<float>(this->get_parameter("scene_z_max").as_double());
 
         for (const auto &point : cloud->points) {
-            if (point.x < scene_x_max && point.y < scene_y_max &&
-                point.z < scene_z_max) {
+            if (point.x >= scene_x_min && point.x <= scene_x_max &&
+                point.y >= scene_y_min && point.y <= scene_y_max &&
+                point.z >= scene_z_min && point.z <= scene_z_max) {
                 cropped_cloud->push_back(point);
             }
         }
@@ -218,12 +225,20 @@ class KinectOctomapNode : public rclcpp::Node {
                 this->get_parameter("scene_y_max").as_double());
             float scene_z_max = static_cast<float>(
                 this->get_parameter("scene_z_max").as_double());
+            float arm_base_x = static_cast<float>(
+                this->get_parameter("arm_base_x").as_double());
+            float arm_base_y = static_cast<float>(
+                this->get_parameter("arm_base_y").as_double());
+            float arm_base_z = static_cast<float>(
+                this->get_parameter("arm_base_z").as_double());
             float arm_max_reach = static_cast<float>(
                 this->get_parameter("arm_max_readh").as_double());
             for (float x = 0.005; x < scene_x_max; x += 0.005) {
                 for (float y = 0.005; y < scene_y_max; y += 0.005) {
                     for (float z = 0.005; z < scene_z_max; z += 0.005) {
-                        float dist = std::sqrt(x * x + y * y + z * z);
+                        float dist = sqrt(pow(x - arm_base_x, 2) +
+                                          pow(y - arm_base_y, 2) +
+                                          pow(z - arm_base_z, 2));
                         if (dist > arm_max_reach) {
                             current_tree->updateNode(octomap::point3d(x, y, z),
                                                      true);
