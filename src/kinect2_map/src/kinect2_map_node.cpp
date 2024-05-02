@@ -349,6 +349,8 @@ class KinectOctomapNode : public rclcpp::Node {
     void saveIntArrayCallback(
         const std_srvs::srv::Trigger::Request::SharedPtr request,
         std_srvs::srv::Trigger::Response::SharedPtr response) {
+        RCLCPP_INFO(this->get_logger(), "Saving IntArray.");
+
         // iterate through the octree, for all x, for all y, for all z, if
         // occupied, write one to the file, else write zero
         std::ofstream intarray_output_file;
@@ -398,6 +400,9 @@ class KinectOctomapNode : public rclcpp::Node {
         std::string output_string = "";
 
         for (float x = scene_x_min; x < scene_x_max; x += resolution) {
+            RCLCPP_INFO(this->get_logger(), "Processing x = %f (total: %f)", x,
+                        scene_x_max);
+
             for (float y = scene_y_min; y < scene_y_max; y += resolution) {
                 for (float z = scene_z_min; z < scene_z_max; z += resolution) {
                     float x_rounded = roundTo(x, resolution);
