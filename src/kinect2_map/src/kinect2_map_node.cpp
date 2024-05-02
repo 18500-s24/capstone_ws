@@ -31,8 +31,6 @@ class KinectOctomapNode : public rclcpp::Node {
                           std::placeholders::_1));
 
         // publishers
-        octomap_publisher_ = this->create_publisher<octomap_msgs::msg::Octomap>(
-            "/kinect2_map/octomap", 10);
         intarray_publisher_ =
             this->create_publisher<std_msgs::msg::UInt8MultiArray>(
                 "/kinect2_map/intarray", 10);
@@ -80,7 +78,6 @@ class KinectOctomapNode : public rclcpp::Node {
         point_cloud_subscriber_;
 
     // publishers
-    rclcpp::Publisher<octomap_msgs::msg::Octomap>::SharedPtr octomap_publisher_;
     rclcpp::Publisher<std_msgs::msg::UInt8MultiArray>::SharedPtr
         intarray_publisher_;
 
@@ -173,13 +170,137 @@ class KinectOctomapNode : public rclcpp::Node {
             }
         }
 
+        RCLCPP_INFO(this->get_logger(), "Cropped point cloud to scene limits.");
+
         return cropped_cloud;
+    }
+
+    /**
+     * @brief Prune the unreachable regions from the octree
+     */
+    void pruneUnreachableRegions(octomap::OcTree *tree) {
+        float scene_x_max =
+            static_cast<float>(this->get_parameter("scene_x_max").as_double());
+        float scene_y_max =
+            static_cast<float>(this->get_parameter("scene_y_max").as_double());
+        float scene_z_max =
+            static_cast<float>(this->get_parameter("scene_z_max").as_double());
+        float arm_base_x =
+            static_cast<float>(this->get_parameter("arm_base_x").as_double());
+        float arm_base_y =
+            static_cast<float>(this->get_parameter("arm_base_y").as_double());
+        float arm_base_z =
+            static_cast<float>(this->get_parameter("arm_base_z").as_double());
+        float arm_max_reach = static_cast<float>(
+            this->get_parameter("arm_max_readh").as_double());
+        for (float x = 0.005; x < scene_x_max; x += 0.005) {
+            for (float y = 0.005; y < scene_y_max; y += 0.005) {
+                for (float z = 0.005; z < scene_z_max; z += 0.005) {
+                    float dist =
+                        sqrt(pow(x - arm_base_x, 2) + pow(y - arm_base_y, 2) +
+                             pow(z - arm_base_z, 2));
+                    if (dist > arm_max_reach) {
+                        tree->updateNode(octomap::point3d(x, y, z), true);
+                    }
+                }
+            }
+        }
+    }
+
+    /**
+     * @brief Fill the back of the objects in the octree
+     */
+    void fillBackOfObjects(octomap::OcTree *tree) {
+        float scene_x_max =
+            static_cast<float>(this->get_parameter("scene_x_max").as_double());
+        float scene_y_max =
+            static_cast<float>(this->get_parameter("scene_y_max").as_double());
+        float scene_z_max =
+            static_cast<float>(this->get_parameter("scene_z_max").as_double());
+
+        // for each voxel in the x-z plane with y >= y_threshold, if the voxel
+        // is occupied, fill all the voxels behind it
+        float y_threshold = 0.15;
+        for (float x = 0.005; x < scene_x_max; x += 0.005) {
+            for (float z = 0.005; z < scene_z_max; z += 0.005) {
+                bool found_occupied = false;
+                float y_occupied = 0.0;
+                for (float y = y_threshold; y < scene_y_max; y += 0.005) {
+                    octomap::OcTreeNode *node = tree->search(x, y, z);
+                    if (node != nullptr) {
+                        if (node->getOccupancy() > 0.5) {
+                            found_occupied = true;
+                            y_occupied = y;
+                            break;
+                        }
+                    }
+                }
+                if (found_occupied) {
+                    for (float y = y_occupied; y < scene_y_max; y += 0.005) {
+                        octomap::OcTreeNode *node = tree->search(x, y, z);
+                        if (node != nullptr) {
+                            if (node->getOccupancy() > 0.5) {
+                                break;
+                            } else {
+                                tree->updateNode(octomap::point3d(x, y, z),
+                                                 true);
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    /**
+     * @brief Publish the octree as UInt8MultiArray
+     */
+    void publishUInt8MultiArray(
+        octomap::OcTree *tree,
+        rclcpp::Publisher<std_msgs::msg::UInt8MultiArray>::SharedPtr
+            publisher) {
+        std_msgs::msg::UInt8MultiArray intarray_msg;
+        float scene_x_max =
+            static_cast<float>(this->get_parameter("scene_x_max").as_double());
+        float scene_y_max =
+            static_cast<float>(this->get_parameter("scene_y_max").as_double());
+        float scene_z_max =
+            static_cast<float>(this->get_parameter("scene_z_max").as_double());
+        for (float z = 0.005; z < scene_z_max; z += 0.005) {
+            for (float y = 0.005; y < scene_y_max; y += 0.005) {
+                for (float x = 0.005; x < scene_x_max; x += 0.005) {
+                    octomap::OcTreeNode *node = tree->search(x, y, z);
+                    if (node != nullptr) {
+                        if (node->getOccupancy() > 0.5) {
+                            intarray_msg.data.push_back(1);
+                        } else {
+                            intarray_msg.data.push_back(0);
+                        }
+                    } else {
+                        RCLCPP_ERROR(this->get_logger(),
+                                     "(%f, %f, %f) not found in octree.", x, y,
+                                     z);
+                    }
+                }
+            }
+        }
+        publisher->publish(intarray_msg);
+        RCLCPP_INFO(
+            this->get_logger(),
+            "Published octree as UInt8MultiArray to /kinect2_map/intarray.");
     }
 
     void
     pointCloudCallback(const sensor_msgs::msg::PointCloud2::SharedPtr msg) {
         RCLCPP_INFO(this->get_logger(),
                     "Received a newly published sensor message.");
+
+        if (this->calibrated) {
+            RCLCPP_INFO(this->get_logger(),
+                        "Calibration done. Doing pruning and cropping.");
+        } else {
+            RCLCPP_INFO(this->get_logger(), "Calibration not done.");
+        }
 
         // Reinitialize the octree with a fresh one each time
         if (current_tree != nullptr) {
@@ -214,49 +335,24 @@ class KinectOctomapNode : public rclcpp::Node {
             current_tree->updateNode(
                 octomap::point3d(point.x, point.y, point.z), true);
         }
+        RCLCPP_INFO(this->get_logger(),
+                    "Converted pcl point cloud to octomap.");
 
         // To avoid the RRT from creating a path through the unreachable
         // regions, we need to set the unreachable regions as occupied
         // Only do this if calibration is done
         if (this->calibrated) {
-            float scene_x_max = static_cast<float>(
-                this->get_parameter("scene_x_max").as_double());
-            float scene_y_max = static_cast<float>(
-                this->get_parameter("scene_y_max").as_double());
-            float scene_z_max = static_cast<float>(
-                this->get_parameter("scene_z_max").as_double());
-            float arm_base_x = static_cast<float>(
-                this->get_parameter("arm_base_x").as_double());
-            float arm_base_y = static_cast<float>(
-                this->get_parameter("arm_base_y").as_double());
-            float arm_base_z = static_cast<float>(
-                this->get_parameter("arm_base_z").as_double());
-            float arm_max_reach = static_cast<float>(
-                this->get_parameter("arm_max_readh").as_double());
-            for (float x = 0.005; x < scene_x_max; x += 0.005) {
-                for (float y = 0.005; y < scene_y_max; y += 0.005) {
-                    for (float z = 0.005; z < scene_z_max; z += 0.005) {
-                        float dist = sqrt(pow(x - arm_base_x, 2) +
-                                          pow(y - arm_base_y, 2) +
-                                          pow(z - arm_base_z, 2));
-                        if (dist > arm_max_reach) {
-                            current_tree->updateNode(octomap::point3d(x, y, z),
-                                                     true);
-                        }
-                    }
-                }
-            }
+            pruneUnreachableRegions(current_tree);
         }
 
-        RCLCPP_INFO(this->get_logger(),
-                    "Converted pcl point cloud to octomap::octree.\n");
+        // Mark the back of the objects as occupied (since the kinect cannot
+        // see the back of the objects)
+        if (this->calibrated) {
+            fillBackOfObjects(current_tree);
+        }
 
-        // Convert octomap to octomap_msgs::Octomap and publish
-        octomap_msgs::msg::Octomap octomap_msg;
-        octomap_msgs::fullMapToMsg(*current_tree, octomap_msg);
-        octomap_publisher_->publish(octomap_msg);
-        RCLCPP_INFO(this->get_logger(),
-                    "Octomap_msg published to /kinect2_map/octomap.\n");
+        // Convert octomap to intarray and publish
+        publishUInt8MultiArray(current_tree, intarray_publisher_);
     }
 
     void
