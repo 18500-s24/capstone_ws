@@ -351,12 +351,6 @@ class KinectOctomapNode : public rclcpp::Node {
         std_srvs::srv::Trigger::Response::SharedPtr response) {
         RCLCPP_INFO(this->get_logger(), "Saving IntArray.");
 
-        // iterate through the octree, for all x, for all y, for all z, if
-        // occupied, write one to the file, else write zero
-        std::ofstream intarray_output_file;
-        intarray_output_file.open(
-            this->get_parameter("intarray_output_path").as_string());
-
         float resolution = this->current_tree->getResolution();
         float scene_x_min = 0;
         float scene_y_min = 0;
@@ -374,63 +368,74 @@ class KinectOctomapNode : public rclcpp::Node {
             static_cast<float>(this->get_parameter("start_y").as_double());
         float start_z =
             static_cast<float>(this->get_parameter("start_z").as_double());
+        size_t start_x_ind =
+            static_cast<size_t>((start_x - scene_x_min) / resolution);
+        size_t start_y_ind =
+            static_cast<size_t>((start_y - scene_y_min) / resolution);
+        size_t start_z_ind =
+            static_cast<size_t>((start_z - scene_z_min) / resolution);
+
         float end_x =
             static_cast<float>(this->get_parameter("end_x").as_double());
         float end_y =
             static_cast<float>(this->get_parameter("end_y").as_double());
         float end_z =
             static_cast<float>(this->get_parameter("end_z").as_double());
+        size_t end_x_ind =
+            static_cast<size_t>((end_x - scene_x_min) / resolution);
+        size_t end_y_ind =
+            static_cast<size_t>((end_y - scene_y_min) / resolution);
+        size_t end_z_ind =
+            static_cast<size_t>((end_z - scene_z_min) / resolution);
 
-        // first get all the occupied voxels
-        std::vector<std::tuple<float, float, float>> occupied_voxels;
+        // iterate through the scene and write to the output
+        // unoccupied voxels are written as 0 (raw byte)
+        // occupied voxels are written as 1 (raw byte)
+        // start and end voxels are written as 2 (raw byte)
+        size_t x_dim =
+            static_cast<size_t>((scene_x_max - scene_x_min) / resolution) + 1;
+        size_t y_dim =
+            static_cast<size_t>((scene_y_max - scene_y_min) / resolution) + 1;
+        size_t z_dim =
+            static_cast<size_t>((scene_z_max - scene_z_min) / resolution) + 1;
+        uint8_t out[x_dim][y_dim][z_dim] = {0};
+
+        // get all the occupied voxels
+        // for each occupied voxel, determine if it is a start or end voxel
+        // if so, write 2 to the output
+        // else, write 1 to the output
         for (auto it = current_tree->begin_leafs();
              it != current_tree->end_leafs(); ++it) {
             octomap::point3d center = it.getCoordinate();
-            auto rounded = std::make_tuple(
-                roundTo(center.x() - (resolution / 2.0), resolution),
-                roundTo(center.y() - (resolution / 2.0), resolution),
-                roundTo(center.z() - (resolution / 2.0), resolution));
-            occupied_voxels.push_back(rounded);
-        }
+            float x = center.x();
+            float y = center.y();
+            float z = center.z();
 
-        // iterate through the scene and write to the file
-        // unoccupied voxels are written as 0
-        // occupied voxels are written as 1
-        // start and end voxels are written as 2
-        std::string output_string = "";
+            size_t x_ind = static_cast<size_t>((x - scene_x_min) / resolution);
+            size_t y_ind = static_cast<size_t>((y - scene_y_min) / resolution);
+            size_t z_ind = static_cast<size_t>((z - scene_z_min) / resolution);
 
-        for (float x = scene_x_min; x < scene_x_max; x += resolution) {
-            RCLCPP_INFO(this->get_logger(), "Processing x = %f (total: %f)", x,
-                        scene_x_max);
-
-            for (float y = scene_y_min; y < scene_y_max; y += resolution) {
-                for (float z = scene_z_min; z < scene_z_max; z += resolution) {
-                    float x_rounded = roundTo(x, resolution);
-                    float y_rounded = roundTo(y, resolution);
-                    float z_rounded = roundTo(z, resolution);
-
-                    if (isClose(x, start_x) && isClose(y, start_y) &&
-                        isClose(z, start_z)) {
-                        output_string += "2 ";
-                    } else if (isClose(x, end_x) && isClose(y, end_y) &&
-                               isClose(z, end_z)) {
-                        output_string += "2 ";
-                    } else {
-                        if (std::find(occupied_voxels.begin(),
-                                      occupied_voxels.end(),
-                                      std::make_tuple(x_rounded, y_rounded,
-                                                      z_rounded)) !=
-                            occupied_voxels.end()) {
-                            output_string += "1 ";
-                        } else {
-                            output_string += "0 ";
-                        }
-                    }
-                }
+            // point is start
+            if (x_ind == start_x_ind && y_ind == start_y_ind &&
+                z_ind == start_z_ind) {
+                out[x_ind][y_ind][z_ind] = 2;
+            }
+            // point is end
+            else if (x_ind == end_x_ind && y_ind == end_y_ind &&
+                     z_ind == end_z_ind) {
+                out[x_ind][y_ind][z_ind] = 2;
+            }
+            // point is occupied
+            else {
+                out[x_ind][y_ind][z_ind] = 1;
             }
         }
 
-        intarray_output_file << output_string;
+        std::ofstream intarray_output_file;
+        intarray_output_file.open(
+            this->get_parameter("intarray_output_path").as_string(),
+            ios::out | ios::binary);
+        intarray_output_file.write((char *)out, sizeof(out));
         intarray_output_file.close();
 
         response->success = true;
