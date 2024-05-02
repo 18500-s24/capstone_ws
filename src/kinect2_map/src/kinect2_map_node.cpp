@@ -440,6 +440,8 @@ class KinectOctomapNode : public rclcpp::Node {
             static_cast<size_t>((scene_z_max - scene_z_min) / resolution) + 1;
         uint8_t out[x_dim][y_dim][z_dim] = {0};
 
+        current_tree->expand();
+
         // get all the occupied voxels
         // for each occupied voxel, determine if it is a start or end voxel
         // if so, write 2 to the output
