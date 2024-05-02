@@ -43,6 +43,8 @@ class KinectOctomapNode : public rclcpp::Node {
         this->declare_parameter<bool>("fill_back", false);
         this->declare_parameter<double>("octree_resolution", 0.01);
         this->declare_parameter<std::string>("octree_output_path", "~/tree.bt");
+        this->declare_parameter<std::string>("octree_augmented_output_path",
+                                             "~/tree_augmented.bt");
         this->declare_parameter<std::string>("intarray_output_path",
                                              "~/scene.txt");
         this->declare_parameter<double>("x_rotation", 240.0);
@@ -338,8 +340,46 @@ class KinectOctomapNode : public rclcpp::Node {
         std::ifstream tree_file;
         tree_file.open(this->get_parameter("octree_output_path").as_string());
 
+        // write the octree
         current_tree->writeBinary(
             this->get_parameter("octree_output_path").as_string());
+
+        // write the "augmented" octree with start and end voxels
+        float scene_x_min = 0.0;
+        float scene_y_min = 0.0;
+        float scene_z_min = 0.0;
+        float scene_x_max =
+            static_cast<float>(this->get_parameter("scene_x_max").as_double());
+        float scene_y_max =
+            static_cast<float>(this->get_parameter("scene_y_max").as_double());
+        float scene_z_max =
+            static_cast<float>(this->get_parameter("scene_z_max").as_double());
+        float start_x =
+            static_cast<float>(this->get_parameter("start_x").as_double());
+        float start_y =
+            static_cast<float>(this->get_parameter("start_y").as_double());
+        float start_z =
+            static_cast<float>(this->get_parameter("start_z").as_double());
+        float end_x =
+            static_cast<float>(this->get_parameter("end_x").as_double());
+        float end_y =
+            static_cast<float>(this->get_parameter("end_y").as_double());
+        float end_z =
+            static_cast<float>(this->get_parameter("end_z").as_double());
+
+        // add the start and end voxels to the octree
+        current_tree->updateNode(octomap::point3d(start_x, start_y, start_z),
+                                 true);
+        current_tree->updateNode(octomap::point3d(end_x, end_y, end_z), true);
+
+        // write the "augmented" octree
+        current_tree->writeBinary(
+            this->get_parameter("octree_augmented_output_path").as_string());
+
+        // remove the start and end voxels from the octree
+        current_tree->deleteNode(octomap::point3d(start_x, start_y, start_z));
+        current_tree->deleteNode(octomap::point3d(end_x, end_y, end_z));
+
         response->success = true;
         response->message = "Octree saved successfully.";
 

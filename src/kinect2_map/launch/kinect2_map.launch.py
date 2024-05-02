@@ -18,6 +18,7 @@ def generate_launch_description():
                         "fill_back": False,
                         "octree_resolution": 0.01,
                         "octree_output_path": "/home/kafka/octree.bt",
+                        "octree_augmented_output_path": "/home/kafka/octree_augmented.bt",
                         "intarray_output_path": "/home/kafka/intarray.txt",
                         "x_rotation": 240.0,
                         "y_rotation": 0.0,
