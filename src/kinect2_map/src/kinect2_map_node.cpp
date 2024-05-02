@@ -409,7 +409,7 @@ class KinectOctomapNode : public rclcpp::Node {
                         output_string += "2 ";
                     } else if (isClose(x, end_x) && isClose(y, end_y) &&
                                isClose(z, end_z)) {
-                        intarray_output_file << "2 ";
+                        output_string += "2 ";
                     } else {
                         if (std::find(occupied_voxels.begin(),
                                       occupied_voxels.end(),
