@@ -444,8 +444,7 @@ class KinectOctomapNode : public rclcpp::Node {
         // for each occupied voxel, determine if it is a start or end voxel
         // if so, write 2 to the output
         // else, write 1 to the output
-        for (auto it = current_tree->begin_leafs();
-             it != current_tree->end_leafs(); ++it) {
+        for (auto it = current_tree->begin(); it != current_tree->end(); ++it) {
             octomap::point3d center = it.getCoordinate();
             float x = center.x();
             float y = center.y();
