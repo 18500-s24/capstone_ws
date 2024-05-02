@@ -16,6 +16,7 @@
 #include <cmath>   /* sin, cos, sqrt, pow, abs, round */
 #include <fstream> /* std::ifstream */
 #include <math.h>  /* M_PI */
+#include <string>  /* std::string */
 
 static bool isClose(float a, float b) { return std::abs(a - b) < 0.0001; }
 
@@ -394,6 +395,8 @@ class KinectOctomapNode : public rclcpp::Node {
         // unoccupied voxels are written as 0
         // occupied voxels are written as 1
         // start and end voxels are written as 2
+        std::string output_string = "";
+
         for (float x = scene_x_min; x < scene_x_max; x += resolution) {
             for (float y = scene_y_min; y < scene_y_max; y += resolution) {
                 for (float z = scene_z_min; z < scene_z_max; z += resolution) {
@@ -403,7 +406,7 @@ class KinectOctomapNode : public rclcpp::Node {
 
                     if (isClose(x, start_x) && isClose(y, start_y) &&
                         isClose(z, start_z)) {
-                        intarray_output_file << "2 ";
+                        output_string += "2 ";
                     } else if (isClose(x, end_x) && isClose(y, end_y) &&
                                isClose(z, end_z)) {
                         intarray_output_file << "2 ";
@@ -413,14 +416,17 @@ class KinectOctomapNode : public rclcpp::Node {
                                       std::make_tuple(x_rounded, y_rounded,
                                                       z_rounded)) !=
                             occupied_voxels.end()) {
-                            intarray_output_file << "1 ";
+                            output_string += "1 ";
                         } else {
-                            intarray_output_file << "0 ";
+                            output_string += "0 ";
                         }
                     }
                 }
             }
         }
+
+        intarray_output_file << output_string;
+        intarray_output_file.close();
 
         response->success = true;
         response->message = "IntArray saved successfully.";
