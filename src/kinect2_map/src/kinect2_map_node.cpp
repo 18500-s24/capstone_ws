@@ -36,6 +36,7 @@ class KinectOctomapNode : public rclcpp::Node {
                 "/kinect2_map/intarray", 10);
 
         // parameters
+        this->declare_parameter<bool>("calibrated", false);
         this->declare_parameter<double>("octree_resolution", 0.01);
         this->declare_parameter<std::string>("output_path", "~/tree.bt");
         this->declare_parameter<double>("x_rotation", 240.0);
@@ -57,12 +58,6 @@ class KinectOctomapNode : public rclcpp::Node {
             "save_octree",
             std::bind(&KinectOctomapNode::saveOctreeCallback, this,
                       std::placeholders::_1, std::placeholders::_2));
-
-        // service to mark calibration done
-        calibration_service_ = this->create_service<std_srvs::srv::Trigger>(
-            "calibration",
-            std::bind(&KinectOctomapNode::calibrationCallback, this,
-                      std::placeholders::_1, std::placeholders::_2));
     }
 
     ~KinectOctomapNode() {
@@ -83,11 +78,8 @@ class KinectOctomapNode : public rclcpp::Node {
 
     // services
     rclcpp::Service<std_srvs::srv::Trigger>::SharedPtr save_octree_service_;
-    rclcpp::Service<std_srvs::srv::Trigger>::SharedPtr calibration_service_;
 
     octomap::OcTree *current_tree = nullptr;
-
-    bool calibrated = false;
 
     /**
      * @brief Compose a transformation matrix based on the parameters
@@ -250,6 +242,8 @@ class KinectOctomapNode : public rclcpp::Node {
                 }
             }
         }
+
+        RCLCPP_INFO(this->get_logger(), "Filled back of objects in octree.");
     }
 
     /**
@@ -295,7 +289,7 @@ class KinectOctomapNode : public rclcpp::Node {
         RCLCPP_INFO(this->get_logger(),
                     "Received a newly published sensor message.");
 
-        if (this->calibrated) {
+        if (this->get_parameter("calibrated").as_bool()) {
             RCLCPP_INFO(this->get_logger(),
                         "Calibration done. Doing pruning and cropping.");
         } else {
@@ -326,7 +320,7 @@ class KinectOctomapNode : public rclcpp::Node {
                                  transformation_matrix);
 
         // Crop the point cloud if calibration is done
-        if (this->calibrated) {
+        if (this->get_parameter("calibrated").as_bool()) {
             transformed_cloud = cropPointCloud(transformed_cloud);
         }
 
@@ -341,18 +335,20 @@ class KinectOctomapNode : public rclcpp::Node {
         // To avoid the RRT from creating a path through the unreachable
         // regions, we need to set the unreachable regions as occupied
         // Only do this if calibration is done
-        if (this->calibrated) {
+        if (this->get_parameter("calibrated").as_bool()) {
             pruneUnreachableRegions(current_tree);
         }
 
         // Mark the back of the objects as occupied (since the kinect cannot
         // see the back of the objects)
-        if (this->calibrated) {
+        if (this->get_parameter("calibrated").as_bool()) {
             fillBackOfObjects(current_tree);
         }
 
         // Convert octomap to intarray and publish
-        publishUInt8MultiArray(current_tree, intarray_publisher_);
+        if (this->get_parameter("calibrated").as_bool()) {
+            publishUInt8MultiArray(current_tree, intarray_publisher_);
+        }
     }
 
     void
@@ -365,14 +361,6 @@ class KinectOctomapNode : public rclcpp::Node {
             this->get_parameter("output_path").as_string());
         response->success = true;
         response->message = "Octree saved successfully.";
-    }
-
-    void calibrationCallback(
-        const std_srvs::srv::Trigger::Request::SharedPtr request,
-        std_srvs::srv::Trigger::Response::SharedPtr response) {
-        this->calibrated = true;
-        response->success = true;
-        response->message = "Calibration done.";
     }
 };
 
