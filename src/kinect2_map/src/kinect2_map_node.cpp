@@ -415,21 +415,18 @@ class KinectOctomapNode : public rclcpp::Node {
             size_t y_ind = static_cast<size_t>((y - scene_y_min) / resolution);
             size_t z_ind = static_cast<size_t>((z - scene_z_min) / resolution);
 
-            // point is start
-            if (x_ind == start_x_ind && y_ind == start_y_ind &&
-                z_ind == start_z_ind) {
-                out[x_ind][y_ind][z_ind] = 2;
-            }
-            // point is end
-            else if (x_ind == end_x_ind && y_ind == end_y_ind &&
-                     z_ind == end_z_ind) {
-                out[x_ind][y_ind][z_ind] = 2;
-            }
-            // point is occupied
-            else {
-                out[x_ind][y_ind][z_ind] = 1;
-            }
+            out[x_ind][y_ind][z_ind] = 1;
         }
+
+        if (out[start_x_ind][start_y_ind][start_z_ind] != 0) {
+            RCLCPP_ERROR(this->get_logger(),
+                         "Start voxel is already occupied.");
+        } else if (out[end_x_ind][end_y_ind][end_z_ind] != 0) {
+            RCLCPP_ERROR(this->get_logger(), "End voxel is already occupied.");
+        }
+
+        out[start_x_ind][start_y_ind][start_z_ind] = 2;
+        out[end_x_ind][end_y_ind][end_z_ind] = 2;
 
         std::ofstream intarray_output_file;
         intarray_output_file.open(
