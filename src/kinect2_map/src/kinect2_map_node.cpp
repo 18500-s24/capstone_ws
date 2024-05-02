@@ -434,7 +434,7 @@ class KinectOctomapNode : public rclcpp::Node {
         std::ofstream intarray_output_file;
         intarray_output_file.open(
             this->get_parameter("intarray_output_path").as_string(),
-            ios::out | ios::binary);
+            std::ios::out | std::ios::binary);
         intarray_output_file.write((char *)out, sizeof(out));
         intarray_output_file.close();
 
